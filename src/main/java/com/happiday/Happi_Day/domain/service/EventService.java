@@ -12,15 +12,18 @@ import com.happiday.Happi_Day.domain.entity.user.User;
 import com.happiday.Happi_Day.domain.repository.*;
 import com.happiday.Happi_Day.exception.CustomException;
 import com.happiday.Happi_Day.exception.ErrorCode;
+import com.happiday.Happi_Day.utils.DefaultImageUtils;
 import com.happiday.Happi_Day.utils.FileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.Triple;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
@@ -34,6 +37,7 @@ public class EventService {
     private final TeamRepository teamRepository;
     private final FileUtils fileUtils;
     private final RedisService redisService;
+    private final DefaultImageUtils defaultImageUtils;
 
 
     @Transactional
@@ -47,46 +51,25 @@ public class EventService {
 
 
         if (thumbnailFile == null || thumbnailFile.isEmpty()) {
-            thumbnailUrl = fileUtils.defaultThumbnail(thumbnailFile);
+            thumbnailUrl = defaultImageUtils.getDefaultImageUrlEventThumbnail();
         } else {
             thumbnailUrl = fileUtils.uploadFile(thumbnailFile);
         }
 
         String imageUrl = fileUtils.uploadFile(imageFile);
 
-        List<String> hashtagRequests = request.getHashtags();
-
-
-        List<Artist> artists = new ArrayList<>();
-        List<Team> teams = new ArrayList<>();
-        List<Hashtag> hashtagList = new ArrayList<>();
-
-        for (String hashtagRequest : hashtagRequests) {
-            Optional<Artist> existingArtist = artistRepository.findByName(hashtagRequest);
-            Optional<Team> existingTeam = teamRepository.findByName(hashtagRequest);
-            if (existingArtist.isPresent()) {
-                artists.add(existingArtist.get());
-            } else if (existingTeam.isPresent()) {
-                teams.add(existingTeam.get());
-            } else {
-                Hashtag newHashtag = Hashtag.builder()
-                        .tag(hashtagRequest)
-                        .build();
-                hashtagList.add(newHashtag);
-            }
-        }
-
-
-
+        // hashTag 처리
+        //get Left, Middle, Right가 각각 1, 2, 3번째 요소 반환
+        Triple<List<Artist>, List<Team>, List<Hashtag>> processedTags = processTags(request.getHashtags());
 
         Event event = Event.builder()
                 .user(user)
                 .title(request.getTitle())
                 .imageUrl(imageUrl)
                 .thumbnailUrl(thumbnailUrl)
-                .artists(artists)
-                .teams(teams)
-                .hashtags(hashtagList)
+                .artists(processedTags.getLeft())
+                .teams(processedTags.getMiddle())
+                .hashtags(processedTags.getRight())
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .description(request.getDescription())
@@ -97,6 +80,7 @@ public class EventService {
         eventRepository.save(event);
         return EventResponseDto.fromEntity(event);
     }
+
 
     public Page<EventListResponseDto> readEvents(Pageable pageable, String filter, String keyword) {
         log.info("이벤트 리스트 조회");
@@ -171,51 +155,28 @@ public class EventService {
 
         // 이미지 업로드 추가
         if (thumbnailFile != null && !thumbnailFile.isEmpty()) {
-            fileUtils.deleteFile(event.getThumbnailUrl());
             String newThumbnailUrl = fileUtils.uploadFile(thumbnailFile);
             event.setThumbnailUrl(newThumbnailUrl);
         }
 
         if (imageFile != null && !imageFile.isEmpty()) {
-            fileUtils.deleteFile(event.getImageUrl());
             String newImageUrl = fileUtils.uploadFile(imageFile);
             event.setImageUrl(newImageUrl);
         }
 
-            List<String> hashtagRequests = request.getHashtags();
+            Triple<List<Artist>, List<Team>, List<Hashtag>> processedTags = processTags(request.getHashtags());
 
-
-            List<Artist> artists = new ArrayList<>();
-            List<Team> teams = new ArrayList<>();
-            List<Hashtag> hashtagList = new ArrayList<>();
-
-            for (String hashtagRequest : hashtagRequests) {
-                Optional<Artist> existingArtist = artistRepository.findByName(hashtagRequest);
-                Optional<Team> existingTeam = teamRepository.findByName(hashtagRequest);
-                if (existingArtist.isPresent()) {
-                    artists.add(existingArtist.get());
-                } else if (existingTeam.isPresent()) {
-                    teams.add(existingTeam.get());
-                } else {
-                    Hashtag newHashtag = Hashtag.builder()
-                            .tag(hashtagRequest)
-                            .build();
-                    hashtagList.add(newHashtag);
-                }
-            }
-
-
-        event.update(Event.builder()
+            event.update(Event.builder()
                 .user(user)
                 .title(request.getTitle())
-                .artists(artists)
-                .teams(teams)
+                .artists(processedTags.getLeft())
+                .teams(processedTags.getMiddle())
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .description(request.getDescription())
                 .location(request.getLocation())
                 .address(request.getAddress())
-                .hashtags(hashtagList)
+                .hashtags(processedTags.getRight())
                 .build());
 
         eventRepository.save(event);
@@ -274,19 +235,30 @@ public class EventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new CustomException(ErrorCode.EVENT_NOT_FOUND));
 
-        boolean isJoined = event.getJoinList().contains(user);
+        // 이미 참여 중인 이벤트
+        boolean isJoined = user.getEventJoinList().stream()
+                .anyMatch(joinList -> joinList.equals(event));
+
+        // 진행 중인 이벤트
+        boolean isOngoingEvent = event.getStartTime().isBefore(LocalDateTime.now())
+                && event.getEndTime().isAfter(LocalDateTime.now());
 
         String response = "";
-        if (isJoined) {
-            // 이미 참여한 경우, 취소
-            user.getEventJoinList().remove(event);
-            event.getJoinList().remove(user);
-            response = " 이벤트 참여 취소";
+
+        if (isOngoingEvent) {
+            if (isJoined) {
+                // 이미 참여한 경우, 취소
+                user.getEventJoinList().remove(event);
+                event.getJoinList().remove(user);
+                response = " 이벤트 참여 취소";
+            } else {
+                // 참여하지 않은 경우, 참여
+                user.getEventJoinList().add(event);
+                event.getJoinList().add(user);
+                response = " 이벤트 참여";
+            }
         } else {
-            // 참여하지 않은 경우, 참여
-            user.getEventJoinList().add(event);
-            event.getJoinList().add(user);
-            response = " 이벤트 참여";
+            throw new CustomException(ErrorCode.EVENT_NOT_ONGOING);
         }
 
         eventRepository.save(event);
@@ -300,4 +272,23 @@ public class EventService {
         redisService.clientRequest(clientAddress, eventId);
     }
 
+    // hashTag 처리
+    private Triple<List<Artist>, List<Team>, List<Hashtag>> processTags(List<String> hashtagRequests) {
+        List<Artist> artists = new ArrayList<>();
+        List<Team> teams = new ArrayList<>();
+        List<Hashtag> hashtags = new ArrayList<>();
+
+        for (String hashtagRequest : hashtagRequests) {
+            Optional<Artist> existingArtist = artistRepository.findByName(hashtagRequest);
+            Optional<Team> existingTeam = teamRepository.findByName(hashtagRequest);
+            if (existingArtist.isPresent()) {
+                artists.add(existingArtist.get());
+            } else if (existingTeam.isPresent()) {
+                teams.add(existingTeam.get());
+            } else {
+                hashtags.add(Hashtag.builder().tag(hashtagRequest).build());
+            }
+        }
+        return Triple.of(artists, teams, hashtags);
+    }
 }

@@ -7,6 +7,7 @@ import com.happiday.Happi_Day.domain.entity.artist.Artist;
 import com.happiday.Happi_Day.domain.entity.chat.ChatMessage;
 import com.happiday.Happi_Day.domain.entity.chat.ChatRoom;
 import com.happiday.Happi_Day.domain.entity.event.Event;
+import com.happiday.Happi_Day.domain.entity.event.EventReview;
 import com.happiday.Happi_Day.domain.entity.product.Order;
 import com.happiday.Happi_Day.domain.entity.product.Sales;
 import com.happiday.Happi_Day.domain.entity.team.Team;
@@ -128,6 +129,10 @@ public class User extends BaseEntity {
     // 이벤트 댓글 매핑
     @OneToMany(mappedBy = "user")
     private List<Event> eventComments = new ArrayList<>();
+
+    // 이벤트 리뷰 매핑
+    @OneToMany(mappedBy = "user")
+    private List<EventReview> eventReviews = new ArrayList<>();
 
     // 유저-이벤트 참가하기 매핑
     @ManyToMany

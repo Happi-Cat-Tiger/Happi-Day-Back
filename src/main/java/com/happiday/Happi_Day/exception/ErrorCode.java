@@ -45,9 +45,14 @@ public enum ErrorCode {
 
     // event
     EVENT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 이벤트를 찾을 수 없습니다."),
-    EVENT_ALREADY_DELETED(HttpStatus.NOT_FOUND, "삭제된 이벤트입니다."),
+    EVENT_ALREADY_DELETED(HttpStatus.NOT_FOUND, "이미 삭제된 이벤트입니다."),
     EVENT_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 이벤트 댓글을 찾을 수 없습니다."),
-    EVENT_COMMENT_ALREADY_DELETED(HttpStatus.NOT_FOUND, "삭제된 댓글입니다."),
+    EVENT_COMMENT_ALREADY_DELETED(HttpStatus.NOT_FOUND, "이미 삭제된 댓글입니다."),
+    EVENT_NOT_ONGOING(HttpStatus.NO_CONTENT, "종료된 이벤트입니다."),
+    EVENT_NOT_JOINED(HttpStatus.FORBIDDEN, "참여하지 않은 이벤트입니다."),
+    EVENT_REVIEW_ALREADY_SUBMITTED(HttpStatus.FORBIDDEN, "이미 리뷰를 작성한 이벤트입니다."),
+    EVENT_REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 리뷰를 찾을 수 없습니다."),
+    EVENT_REVIEW_ALREADY_DELETED(HttpStatus.NOT_FOUND, "이미 삭제된 리뷰입니다."),
 
     // user
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 유저입니다."),
@@ -68,7 +73,7 @@ public enum ErrorCode {
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 댓글입니다."),
 
-    // sales
+    // sales,
     SALES_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 판매글입니다."),
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 옵션입니다."),
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 주문입니다."),
@@ -77,8 +82,7 @@ public enum ErrorCode {
     DELIVERY_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 배달방법입니다."),
     OUT_OF_STOCK(HttpStatus.BAD_REQUEST, "해당 상품은 품절입니다."),
     START_TIME_ERROR(HttpStatus.BAD_REQUEST, "현재보다 이전 시간은 선택할 수 없습니다."),
-    END_TIME_ERROR(HttpStatus.BAD_REQUEST, "시작 시간보다 이전 시간은 선택할 수 없습니다.")
-    ;
+    END_TIME_ERROR(HttpStatus.BAD_REQUEST, "시작 시간보다 이전 시간은 선택할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

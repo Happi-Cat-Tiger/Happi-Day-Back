@@ -66,6 +66,10 @@ public class Event extends BaseEntity {
     @OneToMany(mappedBy = "event", fetch = FetchType.LAZY)
     private List<EventComment> comments;
 
+    // 이벤트 리뷰 관계 설정
+    @OneToMany(mappedBy = "event", fetch = FetchType.LAZY)
+    private List<EventReview> reviews;
+
     // 이벤트 좋아요 매핑
     @ManyToMany(mappedBy = "eventLikes")
     private List<User> likes = new ArrayList<>();
